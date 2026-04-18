@@ -43,12 +43,19 @@
     
     <header class="bg-white shadow-sm sticky top-0 z-50">
         <div class="max-w-3xl mx-auto px-4 py-4 flex justify-between items-center">
-            <h1 class="text-2xl font-bold text-teal-600"><i class="fa-solid fa-droplet text-teal-500"></i> GlucoTrack</h1>
-            <div id="exportButtons" class="hidden">
-                <button onclick="exportToPDF()" class="text-xs bg-red-100 text-red-600 px-3 py-2 rounded-lg mr-2 font-medium hover:bg-red-200 transition"><i class="fa-solid fa-file-pdf"></i> PDF</button>
-                <button onclick="exportToExcel()" class="text-xs bg-green-100 text-green-700 px-3 py-2 rounded-lg font-medium hover:bg-green-200 transition"><i class="fa-solid fa-file-excel"></i> Excel</button>
-            </div>
+    <h1 class="text-2xl font-bold text-teal-600"><i class="fa-solid fa-droplet text-teal-500"></i> GlucoTrack</h1>
+    
+    <div class="flex items-center gap-3">
+        <button onclick="editPatientProfile()" class="text-teal-600 hover:text-teal-800 transition" title="ข้อมูลผู้ป่วย">
+            <i class="fa-solid fa-circle-user text-2xl"></i>
+        </button>
+
+        <div id="exportButtons" class="hidden flex gap-2">
+            <button onclick="exportToPDF()" class="text-xs bg-red-100 text-red-600 px-3 py-2 rounded-lg font-medium hover:bg-red-200 transition"><i class="fa-solid fa-file-pdf"></i> PDF</button>
+            <button onclick="exportToExcel()" class="text-xs bg-green-100 text-green-700 px-3 py-2 rounded-lg font-medium hover:bg-green-200 transition"><i class="fa-solid fa-file-excel"></i> Excel</button>
         </div>
+    </div>
+</div>
         
         <div class="flex justify-around bg-white border-b border-gray-100 max-w-3xl mx-auto">
             <button onclick="switchTab('form')" id="tab-form" class="tab-active flex-1 py-3 text-center transition"><i class="fa-solid fa-pen-to-square"></i> บันทึก</button>
