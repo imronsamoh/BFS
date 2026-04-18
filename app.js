@@ -385,55 +385,104 @@ function renderDashboard() {
 
 // --- ส่วนของ Export PDF สำหรับแพทย์ ---
 window.exportToPDF = function() {
-    const { jsPDF } = window.jspdf;
-    const doc = new jsPDF();
-    
-    // ตั้งค่าฟอนต์ (เนื่องจาก PDF มาตรฐานไม่รองรับภาษาไทย ต้องอาศัยการตั้งค่าฟอนต์เพิ่มเติมในระบบจริง 
-    // หรือใช้การพิมพ์ผ่าน Window.print() แต่ในที่นี้จะจัดโครงสร้างข้อมูลให้แพทย์ดูง่ายที่สุด)
-    
-    doc.setFontSize(18);
-    doc.text("Blood Glucose Report (GlucoTrack)", 14, 20);
-    
-    doc.setFontSize(10);
-    const now = new Date().toLocaleString('th-TH');
-    doc.text(`รายงาน ณ วันที่: ${now}`, 14, 28);
-    
-    // คำนวณสถิติ
+    // 1. เตรียมข้อมูลสถิติ
     const levels = appData.map(r => parseInt(r.GlucoseLevel));
     const avg = Math.round(levels.reduce((a,b) => a+b, 0) / levels.length);
     const max = Math.max(...levels);
     const min = Math.min(...levels);
+    const now = new Date().toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' });
 
-    // ส่วนสรุปสำหรับแพทย์
-    doc.autoTable({
-        startY: 35,
-        head: [['Summary', 'Value']],
-        body: [
-            ['Average Glucose', `${avg} mg/dL`],
-            ['Maximum Recorded', `${max} mg/dL`],
-            ['Minimum Recorded', `${min} min/dL`],
-            ['Total Records', `${appData.length} times`]
-        ],
-        theme: 'striped'
+    // 2. เรียงข้อมูลจากใหม่ไปเก่า
+    const sortedData = [...appData].sort((a,b) => new Date(b.RecordDate) - new Date(a.RecordDate));
+
+    // 3. สร้างเนื้อหา HTML สำหรับรายงาน
+    let reportContent = `
+    <html>
+    <head>
+        <title>รายงานระดับน้ำตาล - GlucoTrack</title>
+        <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;700&display=swap" rel="stylesheet">
+        <style>
+            body { font-family: 'Sarabun', sans-serif; padding: 40px; color: #333; }
+            .header { text-align: center; margin-bottom: 30px; border-bottom: 2px solid #0d9488; padding-bottom: 10px; }
+            .header h1 { color: #0d9488; margin: 0; }
+            .summary-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; margin-bottom: 30px; }
+            .summary-box { background: #f0fdfa; padding: 15px; border-radius: 10px; text-align: center; border: 1px solid #ccfbf1; }
+            .summary-box small { color: #666; font-size: 12px; }
+            .summary-box div { font-size: 20px; font-weight: bold; color: #0d9488; }
+            table { width: 100%; border-collapse: collapse; margin-top: 20px; font-size: 14px; }
+            th { background-color: #0d9488; color: white; padding: 12px; text-align: left; }
+            td { border-bottom: 1px solid #eee; padding: 10px; }
+            .high { color: #e11d48; font-weight: bold; }
+            .footer { margin-top: 40px; text-align: center; font-size: 12px; color: #999; }
+            @media print {
+                body { padding: 0; }
+                button { display: none; }
+            }
+        </style>
+    </head>
+    <body>
+        <div class="header">
+            <h1>รายงานระดับน้ำตาลในเลือด (GlucoTrack)</h1>
+            <p>ผู้ป่วย: IMRON ADAM | วันที่ออกรายงาน: ${now}</p>
+        </div>
+
+        <div class="summary-grid">
+            <div class="summary-box"><small>ค่าเฉลี่ย</small><div>${avg} <small>mg/dL</small></div></div>
+            <div class="summary-box"><small>สูงสุด</small><div>${max} <small>mg/dL</small></div></div>
+            <div class="summary-box"><small>ต่ำสุด</small><div>${min} <small>mg/dL</small></div></div>
+        </div>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>วันที่</th>
+                    <th>เวลา</th>
+                    <th>ระดับน้ำตาล</th>
+                    <th>ช่วงเวลา / บริบท</th>
+                    <th>หมายเหตุ</th>
+                </tr>
+            </thead>
+            <tbody>
+    `;
+
+    sortedData.forEach(row => {
+        const { date, time } = formatThaiDateTime(row.RecordDate, row.RecordTime);
+        const isHigh = parseInt(row.GlucoseLevel) > 130 ? 'class="high"' : '';
+        const meal = row.MealContext && row.MealContext !== '-' ? `(${row.MealContext})` : '';
+
+        reportContent += `
+            <tr>
+                <td>${date}</td>
+                <td>${time}</td>
+                <td ${isHigh}>${row.GlucoseLevel} mg/dL</td>
+                <td>${row.MeasurementType} ${meal}</td>
+                <td>${row.Notes || '-'}</td>
+            </tr>
+        `;
     });
 
-    // ตารางรายละเอียด
-    const body = appData.map(r => [
-        `${r.RecordDate} ${r.RecordTime}`,
-        r.GlucoseLevel,
-        r.MeasurementType,
-        r.Notes || '-'
-    ]);
+    reportContent += `
+            </tbody>
+        </table>
+        <div class="footer">
+            รายงานนี้สร้างโดยอัตโนมัติจากแอปพลิเคชัน GlucoTrack
+        </div>
+        <script>
+            window.onload = function() { 
+                window.print(); 
+                // สำหรับมือถือให้ปิดหน้าต่างหลังจากพิมพ์เสร็จ
+                window.onafterprint = function() { window.close(); };
+            }
+        </script>
+    </body>
+    </html>
+    `;
 
-    doc.autoTable({
-        startY: doc.lastAutoTable.finalY + 10,
-        head: [['Date/Time', 'Level', 'Type', 'Notes']],
-        body: body,
-        headStyles: { fillColor: [13, 148, 136] }
-    });
-
-    // สั่งเปิด PDF ในหน้าต่างใหม่ (ดีที่สุดสำหรับมือถือ) หรือดาวน์โหลด
-    doc.save(`Glucose_Report_${Date.now()}.pdf`);
+    // 4. เปิดหน้าต่างใหม่และเขียน Content ลงไป
+    const printWindow = window.open('', '_blank');
+    printWindow.document.open();
+    printWindow.document.write(reportContent);
+    printWindow.document.close();
 };
 
 // --- ส่วนของ Export Excel ---
