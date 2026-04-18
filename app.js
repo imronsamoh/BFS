@@ -487,8 +487,21 @@ window.exportToPDF = function() {
 
 // --- ส่วนของ Export Excel ---
 window.exportToExcel = function() {
-    const ws = XLSX.utils.json_to_sheet(appData);
+    // จัดระเบียบข้อมูลใหม่สำหรับ Excel ให้แพทย์อ่านง่าย
+    const excelData = appData.map(r => {
+        const { date, time } = formatThaiDateTime(r.RecordDate, r.RecordTime);
+        return {
+            "วันที่": date,
+            "เวลา": time,
+            "ระดับน้ำตาล (mg/dL)": r.GlucoseLevel,
+            "ช่วงเวลาที่วัด": r.MeasurementType,
+            "บริบทมื้ออาหาร": r.MealContext,
+            "หมายเหตุ": r.Notes
+        };
+    });
+
+    const ws = XLSX.utils.json_to_sheet(excelData);
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "GlucoseRecords");
-    XLSX.writeFile(wb, `Glucose_Data_${Date.now()}.xlsx`);
+    XLSX.utils.book_append_sheet(wb, ws, "รายงานค่าน้ำตาล");
+    XLSX.writeFile(wb, `Glucose_Data_IMRON_${Date.now()}.xlsx`);
 };
