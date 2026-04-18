@@ -14,12 +14,16 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 
     <style>
-        body { font-family: 'Sarabun', sans-serif; background-color: #f0fdfa; /* สีพื้นหลังเขียวอมฟ้าอ่อนๆ สบายตา */ }
+        body { font-family: 'Sarabun', sans-serif; background-color: #f0fdfa; }
         .tab-active { color: #0d9488; border-bottom: 3px solid #0d9488; font-weight: 600; }
         .tab-inactive { color: #94a3b8; }
-        .hidden-view { display: none; }
+        .hidden-view { display: none !important; }
     </style>
 </head>
 <body class="text-gray-800 pb-20">
@@ -36,12 +40,13 @@
             <span id="splashStatus" class="text-sm font-medium bg-teal-800/30 px-4 py-2 rounded-full backdrop-blur-sm">กำลังเชื่อมต่อฐานข้อมูล...</span>
         </div>
     </div>
+    
     <header class="bg-white shadow-sm sticky top-0 z-50">
         <div class="max-w-3xl mx-auto px-4 py-4 flex justify-between items-center">
             <h1 class="text-2xl font-bold text-teal-600"><i class="fa-solid fa-droplet text-teal-500"></i> GlucoTrack</h1>
             <div id="exportButtons" class="hidden">
-                <button class="text-xs bg-red-100 text-red-600 px-3 py-2 rounded-lg mr-2 font-medium"><i class="fa-solid fa-file-pdf"></i> PDF</button>
-                <button class="text-xs bg-green-100 text-green-700 px-3 py-2 rounded-lg font-medium"><i class="fa-solid fa-file-excel"></i> Excel</button>
+                <button onclick="exportToPDF()" class="text-xs bg-red-100 text-red-600 px-3 py-2 rounded-lg mr-2 font-medium hover:bg-red-200 transition"><i class="fa-solid fa-file-pdf"></i> PDF</button>
+                <button onclick="exportToExcel()" class="text-xs bg-green-100 text-green-700 px-3 py-2 rounded-lg font-medium hover:bg-green-200 transition"><i class="fa-solid fa-file-excel"></i> Excel</button>
             </div>
         </div>
         
@@ -124,14 +129,15 @@
                         <table class="w-full text-left text-sm" id="historyTable">
                             <thead class="bg-teal-50 text-teal-800">
                                 <tr>
-                                    <th class="p-3 rounded-tl-lg">วันที่/เวลา</th>
+                                    <th class="p-3 rounded-tl-lg whitespace-nowrap">วันที่/เวลา</th>
                                     <th class="p-3">น้ำตาล</th>
                                     <th class="p-3">ช่วงเวลา</th>
-                                    <th class="p-3">จัดการ</th>
+                                    <th class="p-3 text-center">รูป</th>
+                                    <th class="p-3 text-center">จัดการ</th>
                                 </tr>
                             </thead>
                             <tbody id="tableBody" class="divide-y divide-gray-100">
-                                <tr><td colspan="4" class="text-center py-4 text-gray-500"><i class="fa-solid fa-spinner fa-spin"></i> กำลังโหลดข้อมูล...</td></tr>
+                                <tr><td colspan="5" class="text-center py-4 text-gray-500"><i class="fa-solid fa-spinner fa-spin"></i> กำลังโหลดข้อมูล...</td></tr>
                             </tbody>
                         </table>
                     </div>
@@ -165,7 +171,7 @@
                 &copy; 2026 | ผู้พัฒนา: <span class="text-teal-600">IMRON ADAM</span>
             </p>
         </footer>
-        </main>
+    </main>
 
     <script src="app.js"></script>
 </body>
