@@ -79,19 +79,7 @@ function setDefaultDateTime() {
     document.getElementById('recordTime').value = now.toTimeString().slice(0,5);
 }
 
-// ปรับปรุงการ Fetch ให้จัดการ Error ได้ดีขึ้น
-async function fetchData() {
-    const res = await fetch(API_URL);
-    if (!res.ok) throw new Error('Network response was not ok'); 
-    
-    const json = await res.json();
-    if(json.status === 'success') {
-        appData = json.data;
-        populateDropdowns(json.settings);
-    } else {
-        throw new Error(json.message);
-    }
-}
+
 
 // อัปเดตฟังก์ชันเติม Dropdown ให้จัดการกรณีว่างเปล่าได้
 function populateDropdowns(settings) {
@@ -248,38 +236,7 @@ function formatThaiDateTime(rawDate, rawTime) {
     return { date: fDate, time: fTime };
 }
 
-// อัปเดตตารางให้แสดงวันที่สวยๆ
-function renderTable() {
-    const tbody = document.getElementById('tableBody');
-    tbody.innerHTML = '';
-    
-    const sortedData = [...appData].sort((a,b) => new Date(b.RecordDate) - new Date(a.RecordDate));
 
-    sortedData.forEach(row => {
-        const { date, time } = formatThaiDateTime(row.RecordDate, row.RecordTime);
-        let colorClass = parseInt(row.GlucoseLevel) > 130 ? 'text-red-600 font-bold' : 'text-teal-700';
-
-        // สร้าง HTML สำหรับ Thumbnail
-        const thumbHtml = row.ImageURL 
-            ? `<img src="${row.ImageURL}" onclick="showFullImage('${row.ImageURL}')" class="w-10 h-10 object-cover rounded-lg border border-gray-200 cursor-pointer hover:opacity-80 transition mx-auto">`
-            : `<span class="text-gray-300 text-xs">-</span>`;
-
-        tbody.innerHTML += `
-            <tr class="hover:bg-gray-50 transition border-b border-gray-100">
-                <td class="p-3 text-xs">
-                    <div class="font-medium text-gray-700">${date}</div>
-                    <div class="text-gray-400">${time}</div>
-                </td>
-                <td class="p-3 ${colorClass} text-lg">${row.GlucoseLevel}</td>
-                <td class="p-3 text-xs text-gray-600">${row.MeasurementType}</td>
-                <td class="p-3 text-center">${thumbHtml}</td>
-                <td class="p-3 text-center">
-                    <button onclick="viewDetails('${row.ID}')" class="text-teal-500 hover:bg-teal-100 p-2 rounded-full"><i class="fa-solid fa-eye"></i></button>
-                </td>
-            </tr>
-        `;
-    });
-}
 
 // ฟังก์ชันแสดงรูปใหญ่เต็มจอ
 window.showFullImage = function(url) {
@@ -382,6 +339,195 @@ function renderDashboard() {
         options: { responsive: true, maintainAspectRatio: false }
     });
 }
+// เก็บค่า Settings ไว้ใช้งานตอนกดปุ่มแก้ไข
+window.globalSettings = { types: [], contexts: [] };
+
+// โหลดข้อมูลผู้ป่วยจาก LocalStorage 
+let patientProfile = JSON.parse(localStorage.getItem('patientProfile')) || { name: '', hn: '', age: '' };
+
+// อัปเดตฟังก์ชัน fetchData เดิมนิดหน่อย ให้เก็บค่า Settings ทั่วโลก (Global) ด้วย
+async function fetchData() {
+    const res = await fetch(API_URL);
+    if (!res.ok) throw new Error('Network response was not ok'); 
+    const json = await res.json();
+    if(json.status === 'success') {
+        appData = json.data;
+        window.globalSettings = json.settings; // เก็บไว้ใช้ตอนแก้ไข
+        populateDropdowns(json.settings);
+    } else {
+        throw new Error(json.message);
+    }
+}
+
+// ================= ฟังก์ชันจัดการข้อมูลผู้ป่วย =================
+window.editPatientProfile = async function() {
+    const { value: formValues } = await Swal.fire({
+        title: 'ข้อมูลผู้ป่วย (Patient Profile)',
+        html: `
+            <div class="text-left text-sm space-y-3 mt-4">
+                <div>
+                    <label class="block text-gray-600 mb-1">ชื่อ-นามสกุล <span class="text-red-500">*</span></label>
+                    <input id="swal-hn-name" class="w-full border border-gray-300 p-2.5 rounded-lg outline-none focus:border-teal-500" placeholder="ระบุชื่อผู้ป่วย" value="${patientProfile.name}">
+                </div>
+                <div>
+                    <label class="block text-gray-600 mb-1">รหัสประจำตัวผู้ป่วย (HN)</label>
+                    <input id="swal-hn-id" class="w-full border border-gray-300 p-2.5 rounded-lg outline-none focus:border-teal-500" placeholder="เช่น 66-001234" value="${patientProfile.hn}">
+                </div>
+                <div>
+                    <label class="block text-gray-600 mb-1">อายุ (ปี)</label>
+                    <input type="number" id="swal-hn-age" class="w-full border border-gray-300 p-2.5 rounded-lg outline-none focus:border-teal-500" placeholder="ระบุอายุ" value="${patientProfile.age}">
+                </div>
+                <p class="text-xs text-gray-400 mt-2"><i class="fa-solid fa-circle-info"></i> ข้อมูลนี้จะถูกบันทึกไว้ในเบราว์เซอร์ของคุณ และนำไปใช้พิมพ์รายงาน</p>
+            </div>
+        `,
+        focusConfirm: false,
+        showCancelButton: true,
+        confirmButtonText: 'บันทึกข้อมูล',
+        cancelButtonText: 'ยกเลิก',
+        confirmButtonColor: '#0d9488',
+        preConfirm: () => {
+            const name = document.getElementById('swal-hn-name').value.trim();
+            if(!name) { Swal.showValidationMessage('กรุณาระบุชื่อผู้ป่วย'); return false; }
+            return {
+                name: name,
+                hn: document.getElementById('swal-hn-id').value,
+                age: document.getElementById('swal-hn-age').value
+            }
+        }
+    });
+
+    if (formValues) {
+        patientProfile = formValues;
+        localStorage.setItem('patientProfile', JSON.stringify(patientProfile));
+        Swal.fire('บันทึกสำเร็จ', 'อัปเดตข้อมูลผู้ป่วยเรียบร้อยแล้ว', 'success');
+    }
+};
+
+// ================= ฟังก์ชันตาราง และ ปุ่ม Action =================
+function renderTable() {
+    const tbody = document.getElementById('tableBody');
+    tbody.innerHTML = '';
+    
+    if(appData.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" class="text-center py-4 text-gray-500">ไม่มีข้อมูล</td></tr>';
+        return;
+    }
+
+    const sortedData = [...appData].sort((a,b) => new Date(b.RecordDate) - new Date(a.RecordDate));
+
+    sortedData.forEach(row => {
+        const { date, time } = formatThaiDateTime(row.RecordDate, row.RecordTime);
+        let colorClass = parseInt(row.GlucoseLevel) > 130 ? 'text-red-600 font-bold' : 'text-teal-700';
+        
+        const thumbHtml = row.ImageURL 
+            ? `<img src="${row.ImageURL}" onclick="showFullImage('${row.ImageURL}')" class="w-10 h-10 object-cover rounded-lg border border-gray-200 cursor-pointer hover:opacity-80 transition mx-auto">`
+            : `<span class="text-gray-300 text-xs">-</span>`;
+
+        tbody.innerHTML += `
+            <tr class="hover:bg-gray-50 transition border-b border-gray-100">
+                <td class="p-3 text-xs">
+                    <div class="font-medium text-gray-700">${date}</div>
+                    <div class="text-gray-400">${time}</div>
+                </td>
+                <td class="p-3 ${colorClass} text-lg">${row.GlucoseLevel}</td>
+                <td class="p-3 text-xs text-gray-600">${row.MeasurementType}</td>
+                <td class="p-3 text-center">${thumbHtml}</td>
+                <td class="p-3 text-center whitespace-nowrap">
+                    <button onclick="viewDetails('${row.ID}')" class="text-teal-500 hover:bg-teal-100 p-2 rounded-full transition"><i class="fa-solid fa-eye"></i></button>
+                    <button onclick="editRecord('${row.ID}')" class="text-orange-500 hover:bg-orange-100 p-2 rounded-full transition ml-1"><i class="fa-solid fa-pen-to-square"></i></button>
+                </td>
+            </tr>
+        `;
+    });
+}
+
+// ================= ฟังก์ชันแก้ไขข้อมูล (Update) =================
+window.editRecord = async function(id) {
+    const record = appData.find(r => r.ID === id);
+    if(!record) return;
+
+    // สร้างตัวเลือก Dropdown จาก Settings ที่มีอยู่
+    const typeOpts = globalSettings.types.map(t => `<option value="${t}" ${record.MeasurementType === t ? 'selected' : ''}>${t}</option>`).join('');
+    const contextOpts = `<option value="-">-</option>` + globalSettings.contexts.map(c => `<option value="${c}" ${record.MealContext === c ? 'selected' : ''}>${c}</option>`).join('');
+
+    const { value: formValues } = await Swal.fire({
+        title: 'แก้ไขข้อมูลการวัด',
+        html: `
+            <div class="text-left text-sm space-y-3 mt-4">
+                <div class="grid grid-cols-2 gap-2">
+                    <div>
+                        <label class="block text-gray-600 mb-1">วันที่</label>
+                        <input type="date" id="editDate" class="w-full border p-2 rounded-lg" value="${record.RecordDate.split('T')[0]}">
+                    </div>
+                    <div>
+                        <label class="block text-gray-600 mb-1">เวลา</label>
+                        <input type="time" id="editTime" class="w-full border p-2 rounded-lg" value="${record.RecordTime.substring(0,5)}">
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-gray-600 mb-1">ระดับน้ำตาล (mg/dL)</label>
+                    <input type="number" id="editLevel" class="w-full border p-2 rounded-lg font-bold text-teal-600" value="${record.GlucoseLevel}">
+                </div>
+                <div>
+                    <label class="block text-gray-600 mb-1">ช่วงเวลา</label>
+                    <select id="editType" class="w-full border p-2 rounded-lg bg-white">${typeOpts}</select>
+                </div>
+                <div>
+                    <label class="block text-gray-600 mb-1">บริบทมื้ออาหาร</label>
+                    <select id="editContext" class="w-full border p-2 rounded-lg bg-white">${contextOpts}</select>
+                </div>
+                <div>
+                    <label class="block text-gray-600 mb-1">หมายเหตุ</label>
+                    <textarea id="editNotes" class="w-full border p-2 rounded-lg" rows="2">${record.Notes || ''}</textarea>
+                </div>
+            </div>
+        `,
+        focusConfirm: false,
+        showCancelButton: true,
+        confirmButtonText: 'บันทึกการแก้ไข',
+        cancelButtonText: 'ยกเลิก',
+        confirmButtonColor: '#f97316', // สีส้ม
+        preConfirm: () => {
+            return {
+                action: 'update',
+                id: record.ID,
+                recordDate: document.getElementById('editDate').value,
+                recordTime: document.getElementById('editTime').value,
+                glucoseLevel: document.getElementById('editLevel').value,
+                measurementType: document.getElementById('editType').value,
+                mealContext: document.getElementById('editContext').value,
+                notes: document.getElementById('editNotes').value
+            }
+        }
+    });
+
+    if (formValues) {
+        Swal.fire({ title: 'กำลังบันทึกการแก้ไข...', allowOutsideClick: false, didOpen: () => { Swal.showLoading(); } });
+        try {
+            const response = await fetch(API_URL, { method: 'POST', body: JSON.stringify(formValues) });
+            const result = await response.json();
+            if (result.status === 'success') {
+                Swal.fire('สำเร็จ', 'อัปเดตข้อมูลเรียบร้อยแล้ว', 'success');
+                initApp(); // โหลดข้อมูลมาแสดงใหม่
+            } else {
+                throw new Error(result.message);
+            }
+        } catch (error) {
+            Swal.fire('ข้อผิดพลาด', 'ไม่สามารถบันทึกได้', 'error');
+        }
+    }
+};
+
+// ================= อัปเดตส่วนรายงาน PDF (ให้ดึงชื่อคนไข้มาใช้) =================
+// ในส่วนของฟังก์ชัน exportToPDF() ให้แก้ไขบรรทัดข้อมูลคนไข้เป็นแบบนี้ครับ:
+/* <div class="header">
+        <h1>รายงานระดับน้ำตาลในเลือด (GlucoTrack)</h1>
+        <p>ผู้ป่วย: <b>${patientProfile.name || 'ไม่ระบุชื่อ'}</b> 
+        ${patientProfile.hn ? ` | HN: ${patientProfile.hn}` : ''} 
+        ${patientProfile.age ? ` | อายุ: ${patientProfile.age} ปี` : ''} 
+        | วันที่ออกรายงาน: ${now}</p>
+    </div>
+*/
 
 // --- ส่วนของ Export PDF สำหรับแพทย์ ---
 window.exportToPDF = function() {
@@ -422,9 +568,12 @@ window.exportToPDF = function() {
     </head>
     <body>
         <div class="header">
-            <h1>รายงานระดับน้ำตาลในเลือด (GlucoTrack)</h1>
-            <p>ผู้ป่วย: IMRON ADAM | วันที่ออกรายงาน: ${now}</p>
-        </div>
+        <h1>รายงานระดับน้ำตาลในเลือด (GlucoTrack)</h1>
+        <p>ผู้ป่วย: <b>${patientProfile.name || 'ไม่ระบุชื่อ'}</b> 
+        ${patientProfile.hn ? ` | HN: ${patientProfile.hn}` : ''} 
+        ${patientProfile.age ? ` | อายุ: ${patientProfile.age} ปี` : ''} 
+        | วันที่ออกรายงาน: ${now}</p>
+    </div>
 
         <div class="summary-grid">
             <div class="summary-box"><small>ค่าเฉลี่ย</small><div>${avg} <small>mg/dL</small></div></div>
