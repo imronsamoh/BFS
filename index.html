@@ -62,19 +62,29 @@
                     </div>
 
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                            <label class="block text-sm font-medium text-gray-600 mb-1">ช่วงเวลาที่วัด <span class="text-red-500">*</span></label>
-                            <select id="measurementType" required class="w-full border border-gray-200 rounded-xl p-3 focus:ring-2 focus:ring-teal-400 outline-none bg-white">
-                                <option value="">กำลังโหลดข้อมูล...</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label class="block text-sm font-medium text-gray-600 mb-1">บริบทมื้ออาหาร</label>
-                            <select id="mealContext" class="w-full border border-gray-200 rounded-xl p-3 focus:ring-2 focus:ring-teal-400 outline-none bg-white">
-                                <option value="-">ไม่ระบุ</option>
-                            </select>
-                        </div>
-                    </div>
+    <div>
+        <label class="block text-sm font-medium text-gray-600 mb-1">ช่วงเวลาที่วัด <span class="text-red-500">*</span></label>
+        <div class="flex gap-2">
+            <select id="measurementType" required class="flex-1 border border-gray-200 rounded-xl p-3 focus:ring-2 focus:ring-teal-400 outline-none bg-white">
+                <option value="">เลือกช่วงเวลา...</option>
+            </select>
+            <button type="button" onclick="addNewOption('MeasurementType')" class="bg-teal-50 text-teal-600 border border-teal-200 px-4 rounded-xl hover:bg-teal-100 transition shadow-sm" title="เพิ่มตัวเลือก">
+                <i class="fa-solid fa-plus"></i>
+            </button>
+        </div>
+    </div>
+    <div>
+        <label class="block text-sm font-medium text-gray-600 mb-1">บริบทมื้ออาหาร</label>
+        <div class="flex gap-2">
+            <select id="mealContext" class="flex-1 border border-gray-200 rounded-xl p-3 focus:ring-2 focus:ring-teal-400 outline-none bg-white">
+                <option value="-">ไม่ระบุ</option>
+            </select>
+            <button type="button" onclick="addNewOption('MealContext')" class="bg-teal-50 text-teal-600 border border-teal-200 px-4 rounded-xl hover:bg-teal-100 transition shadow-sm" title="เพิ่มตัวเลือก">
+                <i class="fa-solid fa-plus"></i>
+            </button>
+        </div>
+    </div>
+</div>
 
                     <div>
                         <label class="block text-sm font-medium text-gray-600 mb-1">หมายเหตุ / อาการ</label>
