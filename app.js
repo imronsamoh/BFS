@@ -70,18 +70,77 @@ async function fetchData() {
     }
 }
 
+// อัปเดตฟังก์ชันเติม Dropdown ให้จัดการกรณีว่างเปล่าได้
 function populateDropdowns(settings) {
     const typeSelect = document.getElementById('measurementType');
     const contextSelect = document.getElementById('mealContext');
     
+    typeSelect.innerHTML = '<option value="">เลือกช่วงเวลา...</option>';
+    contextSelect.innerHTML = '<option value="-">ไม่ระบุ</option>';
+
     if(!settings) return;
 
-    typeSelect.innerHTML = '<option value="">เลือกช่วงเวลา...</option>';
-    settings.types.forEach(t => typeSelect.innerHTML += `<option value="${t}">${t}</option>`);
+    if(settings.types && settings.types.length > 0) {
+        settings.types.forEach(t => typeSelect.innerHTML += `<option value="${t}">${t}</option>`);
+    } else {
+        typeSelect.innerHTML += `<option value="ก่อนอาหาร">ก่อนอาหาร (ค่าเริ่มต้น)</option>`;
+    }
     
-    contextSelect.innerHTML = '<option value="-">ไม่ระบุ</option>';
-    settings.contexts.forEach(c => contextSelect.innerHTML += `<option value="${c}">${c}</option>`);
+    if(settings.contexts && settings.contexts.length > 0) {
+        settings.contexts.forEach(c => contextSelect.innerHTML += `<option value="${c}">${c}</option>`);
+    }
 }
+
+// ฟังก์ชันสำหรับเพิ่มตัวเลือกใหม่ (เรียกใช้เมื่อกดปุ่ม +)
+window.addNewOption = async function(type) {
+    const titleText = type === 'MeasurementType' ? 'เพิ่ม "ช่วงเวลาที่วัด" ใหม่' : 'เพิ่ม "บริบทมื้ออาหาร" ใหม่';
+    
+    const { value: newValue } = await Swal.fire({
+        title: titleText,
+        input: 'text',
+        inputPlaceholder: 'พิมพ์ตัวเลือกใหม่ที่นี่...',
+        showCancelButton: true,
+        confirmButtonText: 'บันทึกตัวเลือก',
+        cancelButtonText: 'ยกเลิก',
+        confirmButtonColor: '#0d9488',
+        inputValidator: (value) => {
+            if (!value) {
+                return 'กรุณาระบุข้อมูล!';
+            }
+        }
+    });
+
+    if (newValue) {
+        Swal.fire({
+            title: 'กำลังบันทึก...',
+            allowOutsideClick: false,
+            didOpen: () => { Swal.showLoading(); }
+        });
+
+        try {
+            const response = await fetch(API_URL, {
+                method: 'POST',
+                body: JSON.stringify({
+                    action: 'addSetting',
+                    settingType: type,
+                    settingValue: newValue.trim()
+                })
+            });
+            
+            const result = await response.json();
+
+            if (result.status === 'success') {
+                Swal.fire('สำเร็จ', 'เพิ่มตัวเลือกแล้ว', 'success');
+                fetchData(); // โหลดข้อมูล Dropdown มาใหม่จาก Sheet ทันที
+            } else {
+                throw new Error(result.message);
+            }
+        } catch (error) {
+            Swal.fire('ข้อผิดพลาด', 'ไม่สามารถเพิ่มตัวเลือกได้', 'error');
+            console.error(error);
+        }
+    }
+};
 
 const toBase64 = file => new Promise((resolve, reject) => {
     const reader = new FileReader();
