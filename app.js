@@ -221,6 +221,34 @@ async function handleFormSubmit(e) {
     }
 }
 
+// ฟังก์ชันตัวช่วยสำหรับแปลงวันที่และเวลาให้อ่านง่าย
+function formatThaiDateTime(rawDate, rawTime) {
+    let fDate = rawDate;
+    let fTime = rawTime;
+
+    try {
+        // จัดการวันที่ (แปลงเป็น 17 เม.ย. 2569)
+        const d = new Date(rawDate);
+        if (!isNaN(d.getTime())) {
+            fDate = d.toLocaleDateString('th-TH', { year: 'numeric', month: 'short', day: 'numeric' });
+        }
+        
+        // จัดการเวลา (ล้างค่า 1899-12-30 และเติมคำว่า น.)
+        if (rawTime.includes('T')) {
+            const t = new Date(rawTime);
+            fTime = t.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }) + ' น.';
+        } else {
+            // กรณีเป็น String ปกติ เช่น "17:00:00" ให้ตัดเหลือ "17:00"
+            fTime = rawTime.substring(0, 5) + ' น.';
+        }
+    } catch (e) {
+        console.error("Date format error:", e);
+    }
+
+    return { date: fDate, time: fTime };
+}
+
+// อัปเดตตารางให้แสดงวันที่สวยๆ
 function renderTable() {
     const tbody = document.getElementById('tableBody');
     tbody.innerHTML = '';
@@ -233,41 +261,74 @@ function renderTable() {
     const sortedData = [...appData].sort((a,b) => new Date(b.RecordDate) - new Date(a.RecordDate));
 
     sortedData.forEach(row => {
-        const dateObj = new Date(row.RecordDate);
-        const dateStr = `${dateObj.getDate()}/${dateObj.getMonth()+1}/${dateObj.getFullYear().toString().substr(-2)}`;
+        // เรียกใช้ตัวแปลงวันที่
+        const { date, time } = formatThaiDateTime(row.RecordDate, row.RecordTime);
+        
         let colorClass = parseInt(row.GlucoseLevel) > 130 ? 'text-red-600 font-bold' : 'text-teal-700';
 
         tbody.innerHTML += `
             <tr class="hover:bg-gray-50 transition border-b border-gray-100">
                 <td class="p-3 text-xs">
-                    <div class="font-medium text-gray-700">${dateStr}</div>
-                    <div class="text-gray-400">${row.RecordTime}</div>
+                    <div class="font-medium text-gray-700">${date}</div>
+                    <div class="text-gray-400"><i class="fa-regular fa-clock"></i> ${time}</div>
                 </td>
-                <td class="p-3 ${colorClass}">${row.GlucoseLevel}</td>
+                <td class="p-3 ${colorClass} text-lg font-semibold">${row.GlucoseLevel}</td>
                 <td class="p-3 text-xs text-gray-600">${row.MeasurementType}</td>
                 <td class="p-3">
-                    <button onclick="viewDetails('${row.ID}')" class="text-teal-500 hover:bg-teal-100 p-2 rounded-full transition"><i class="fa-solid fa-eye"></i></button>
+                    <button onclick="viewDetails('${row.ID}')" class="text-teal-500 hover:bg-teal-100 p-2 rounded-full transition shadow-sm"><i class="fa-solid fa-file-lines"></i></button>
                 </td>
             </tr>
         `;
     });
 }
 
+// อัปเดต Popup ให้ดูสะอาดตาและอ่านง่าย
 window.viewDetails = function(id) {
     const record = appData.find(r => r.ID === id);
     if(record) {
+        const { date, time } = formatThaiDateTime(record.RecordDate, record.RecordTime);
+        
+        let contextText = record.MealContext && record.MealContext !== '-' ? `<span class="bg-teal-50 text-teal-700 px-2 py-1 rounded text-xs ml-2">${record.MealContext}</span>` : '';
+
         Swal.fire({
-            title: 'รายละเอียด',
+            title: 'รายละเอียดการวัด',
             html: `
-                <div class="text-left text-sm space-y-2 mt-4">
-                    <p><b>ระดับน้ำตาล:</b> <span class="text-lg text-teal-600 font-bold">${record.GlucoseLevel} mg/dL</span></p>
-                    <p><b>วัดเมื่อ:</b> ${record.RecordDate} ${record.RecordTime}</p>
-                    <p><b>ประเภท:</b> ${record.MeasurementType} ${record.MealContext !== '-' ? `(${record.MealContext})` : ''}</p>
-                    <p><b>หมายเหตุ:</b> ${record.Notes || '-'}</p>
-                    ${record.ImageURL ? `<div class="mt-3"><a href="${record.ImageURL}" target="_blank" class="text-blue-500 underline"><i class="fa-solid fa-image"></i> ดูรูปภาพที่แนบ</a></div>` : ''}
+                <div class="text-left text-sm space-y-4 mt-4 bg-gray-50 p-4 rounded-xl border border-gray-100">
+                    <div class="flex justify-between items-center border-b border-gray-200 pb-2">
+                        <span class="text-gray-500">ระดับน้ำตาล</span>
+                        <span class="text-2xl text-teal-600 font-bold">${record.GlucoseLevel} <span class="text-sm font-normal text-gray-500">mg/dL</span></span>
+                    </div>
+                    
+                    <div class="flex flex-col gap-1">
+                        <div class="flex justify-between">
+                            <span class="text-gray-500"><i class="fa-regular fa-calendar text-teal-500 w-5"></i> วันที่</span>
+                            <span class="font-medium text-gray-800">${date}</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-gray-500"><i class="fa-regular fa-clock text-teal-500 w-5"></i> เวลา</span>
+                            <span class="font-medium text-gray-800">${time}</span>
+                        </div>
+                    </div>
+
+                    <div class="bg-white p-3 rounded-lg border border-gray-100 shadow-sm">
+                        <p class="text-gray-500 text-xs mb-1">ช่วงเวลาที่วัด</p>
+                        <p class="font-medium text-gray-800">${record.MeasurementType} ${contextText}</p>
+                    </div>
+
+                    ${record.Notes ? `
+                    <div class="bg-yellow-50 p-3 rounded-lg border border-yellow-100 text-yellow-800">
+                        <p class="text-xs text-yellow-600 mb-1"><i class="fa-solid fa-pen"></i> หมายเหตุ</p>
+                        <p>${record.Notes}</p>
+                    </div>` : ''}
+
+                    ${record.ImageURL ? `
+                    <a href="${record.ImageURL}" target="_blank" class="block w-full text-center bg-blue-50 hover:bg-blue-100 text-blue-600 py-2 rounded-lg transition border border-blue-100 mt-2">
+                        <i class="fa-solid fa-image"></i> ดูรูปภาพที่แนบ
+                    </a>` : ''}
                 </div>
             `,
-            confirmButtonColor: '#0d9488'
+            confirmButtonColor: '#0d9488',
+            confirmButtonText: 'ปิดหน้าต่าง'
         });
     }
 };
