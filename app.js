@@ -7,10 +7,41 @@ let myChart = null;
 
 document.addEventListener('DOMContentLoaded', () => {
     setDefaultDateTime();
-    fetchData(); // ดึงข้อมูลตอนเปิดแอป
+    
+    // เริ่มกระบวนการโหลดข้อมูลเมื่อเปิดแอป
+    initApp();
 
     document.getElementById('recordForm').addEventListener('submit', handleFormSubmit);
 });
+
+// ฟังก์ชันควบคุม Splash Screen ตอนเปิดแอป
+async function initApp() {
+    const splash = document.getElementById('splashScreen');
+    const status = document.getElementById('splashStatus');
+    
+    try {
+        status.innerText = 'กำลังดาวน์โหลดข้อมูลล่าสุด...';
+        
+        // รอจนกว่าจะดึงข้อมูลเสร็จ
+        await fetchData(); 
+        
+        status.innerText = 'เตรียมพร้อมใช้งาน!';
+        status.classList.replace('bg-teal-800/30', 'bg-green-500/80'); // เปลี่ยนสีเป็นเขียวเมื่อเสร็จ
+        
+        // หน่วงเวลาเล็กน้อยให้ผู้ใช้เห็นว่าสำเร็จ แล้วค่อย Fade Out
+        setTimeout(() => {
+            splash.style.opacity = '0';
+            setTimeout(() => {
+                splash.style.display = 'none';
+            }, 500); // ระยะเวลา fade ให้ตรงกับ duration-500 ใน Tailwind
+        }, 600);
+
+    } catch (error) {
+        status.innerHTML = '<span class="text-red-200"><i class="fa-solid fa-triangle-exclamation"></i> การเชื่อมต่อล้มเหลว กรุณารีเฟรชหน้าเว็บ</span>';
+        status.classList.replace('bg-teal-800/30', 'bg-red-900/50');
+    }
+}
+
 
 // ประกาศให้อยู่ใน Global Object (window) เพื่อให้ HTML มองเห็นเสมอ
 window.switchTab = function(tabName) {
@@ -50,23 +81,15 @@ function setDefaultDateTime() {
 
 // ปรับปรุงการ Fetch ให้จัดการ Error ได้ดีขึ้น
 async function fetchData() {
-    try {
-        const res = await fetch(API_URL);
-        
-        // ถ้าเกิดติด CORS หรือ API ล่ม จะตกมาที่นี่
-        if (!res.ok) throw new Error('Network response was not ok'); 
-        
-        const json = await res.json();
-        if(json.status === 'success') {
-            appData = json.data;
-            populateDropdowns(json.settings);
-        } else {
-            console.error("Backend Error:", json.message);
-        }
-    } catch (error) {
-        console.error("Fetch Data Error (CORS หรือ API ผิดพลาด):", error);
-        // แสดงแจ้งเตือนให้ผู้ใช้ทราบ
-        Swal.fire('การเชื่อมต่อผิดพลาด', 'ไม่สามารถดึงข้อมูลจากฐานข้อมูลได้ โปรดตรวจสอบ API URL หรือการตั้งค่า CORS', 'error');
+    const res = await fetch(API_URL);
+    if (!res.ok) throw new Error('Network response was not ok'); 
+    
+    const json = await res.json();
+    if(json.status === 'success') {
+        appData = json.data;
+        populateDropdowns(json.settings);
+    } else {
+        throw new Error(json.message);
     }
 }
 
