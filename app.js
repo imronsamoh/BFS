@@ -253,34 +253,47 @@ function renderTable() {
     const tbody = document.getElementById('tableBody');
     tbody.innerHTML = '';
     
-    if(appData.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="4" class="text-center py-4 text-gray-500">ไม่มีข้อมูล</td></tr>';
-        return;
-    }
-
     const sortedData = [...appData].sort((a,b) => new Date(b.RecordDate) - new Date(a.RecordDate));
 
     sortedData.forEach(row => {
-        // เรียกใช้ตัวแปลงวันที่
         const { date, time } = formatThaiDateTime(row.RecordDate, row.RecordTime);
-        
         let colorClass = parseInt(row.GlucoseLevel) > 130 ? 'text-red-600 font-bold' : 'text-teal-700';
+
+        // สร้าง HTML สำหรับ Thumbnail
+        const thumbHtml = row.ImageURL 
+            ? `<img src="${row.ImageURL}" onclick="showFullImage('${row.ImageURL}')" class="w-10 h-10 object-cover rounded-lg border border-gray-200 cursor-pointer hover:opacity-80 transition mx-auto">`
+            : `<span class="text-gray-300 text-xs">-</span>`;
 
         tbody.innerHTML += `
             <tr class="hover:bg-gray-50 transition border-b border-gray-100">
                 <td class="p-3 text-xs">
                     <div class="font-medium text-gray-700">${date}</div>
-                    <div class="text-gray-400"><i class="fa-regular fa-clock"></i> ${time}</div>
+                    <div class="text-gray-400">${time}</div>
                 </td>
-                <td class="p-3 ${colorClass} text-lg font-semibold">${row.GlucoseLevel}</td>
+                <td class="p-3 ${colorClass} text-lg">${row.GlucoseLevel}</td>
                 <td class="p-3 text-xs text-gray-600">${row.MeasurementType}</td>
-                <td class="p-3">
-                    <button onclick="viewDetails('${row.ID}')" class="text-teal-500 hover:bg-teal-100 p-2 rounded-full transition shadow-sm"><i class="fa-solid fa-file-lines"></i></button>
+                <td class="p-3 text-center">${thumbHtml}</td>
+                <td class="p-3 text-center">
+                    <button onclick="viewDetails('${row.ID}')" class="text-teal-500 hover:bg-teal-100 p-2 rounded-full"><i class="fa-solid fa-eye"></i></button>
                 </td>
             </tr>
         `;
     });
 }
+
+// ฟังก์ชันแสดงรูปใหญ่เต็มจอ
+window.showFullImage = function(url) {
+    Swal.fire({
+        imageUrl: url,
+        imageAlt: 'Glucose Meter Result',
+        showCloseButton: true,
+        showConfirmButton: false,
+        background: 'transparent',
+        customClass: {
+            image: 'rounded-2xl shadow-2xl max-h-[80vh] w-auto'
+        }
+    });
+};
 
 // อัปเดต Popup ให้ดูสะอาดตาและอ่านง่าย
 window.viewDetails = function(id) {
@@ -369,3 +382,64 @@ function renderDashboard() {
         options: { responsive: true, maintainAspectRatio: false }
     });
 }
+
+// --- ส่วนของ Export PDF สำหรับแพทย์ ---
+window.exportToPDF = function() {
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF();
+    
+    // ตั้งค่าฟอนต์ (เนื่องจาก PDF มาตรฐานไม่รองรับภาษาไทย ต้องอาศัยการตั้งค่าฟอนต์เพิ่มเติมในระบบจริง 
+    // หรือใช้การพิมพ์ผ่าน Window.print() แต่ในที่นี้จะจัดโครงสร้างข้อมูลให้แพทย์ดูง่ายที่สุด)
+    
+    doc.setFontSize(18);
+    doc.text("Blood Glucose Report (GlucoTrack)", 14, 20);
+    
+    doc.setFontSize(10);
+    const now = new Date().toLocaleString('th-TH');
+    doc.text(`รายงาน ณ วันที่: ${now}`, 14, 28);
+    
+    // คำนวณสถิติ
+    const levels = appData.map(r => parseInt(r.GlucoseLevel));
+    const avg = Math.round(levels.reduce((a,b) => a+b, 0) / levels.length);
+    const max = Math.max(...levels);
+    const min = Math.min(...levels);
+
+    // ส่วนสรุปสำหรับแพทย์
+    doc.autoTable({
+        startY: 35,
+        head: [['Summary', 'Value']],
+        body: [
+            ['Average Glucose', `${avg} mg/dL`],
+            ['Maximum Recorded', `${max} mg/dL`],
+            ['Minimum Recorded', `${min} min/dL`],
+            ['Total Records', `${appData.length} times`]
+        ],
+        theme: 'striped'
+    });
+
+    // ตารางรายละเอียด
+    const body = appData.map(r => [
+        `${r.RecordDate} ${r.RecordTime}`,
+        r.GlucoseLevel,
+        r.MeasurementType,
+        r.Notes || '-'
+    ]);
+
+    doc.autoTable({
+        startY: doc.lastAutoTable.finalY + 10,
+        head: [['Date/Time', 'Level', 'Type', 'Notes']],
+        body: body,
+        headStyles: { fillColor: [13, 148, 136] }
+    });
+
+    // สั่งเปิด PDF ในหน้าต่างใหม่ (ดีที่สุดสำหรับมือถือ) หรือดาวน์โหลด
+    doc.save(`Glucose_Report_${Date.now()}.pdf`);
+};
+
+// --- ส่วนของ Export Excel ---
+window.exportToExcel = function() {
+    const ws = XLSX.utils.json_to_sheet(appData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "GlucoseRecords");
+    XLSX.writeFile(wb, `Glucose_Data_${Date.now()}.xlsx`);
+};
